@@ -1,0 +1,21 @@
+{
+	# AGENTS.md §14: админ-интерфейс контейнера закрыт.
+	admin off
+}
+
+{$SITE_ADDRESS:localhost} {
+	# Свой локальный CA. Корневой сертификат ставится на устройства (см. README).
+	tls internal
+
+	encode gzip
+
+	handle_path /api/* {
+		reverse_proxy app:8000
+	}
+
+	handle {
+		root * /srv/web
+		try_files {path} /index.html
+		file_server
+	}
+}

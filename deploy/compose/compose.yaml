@@ -1,0 +1,48 @@
+name: discipline
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  app:
+    build:
+      context: ../../apps/api
+    image: discipline-app:local
+    environment:
+      DISCIPLINE_LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - app-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    restart: unless-stopped
+    stop_grace_period: 15s
+    logging: *logging
+    # Портов наружу нет: доступ только через caddy.
+
+  caddy:
+    build:
+      context: ../..
+      dockerfile: deploy/caddy/Dockerfile
+    image: discipline-caddy:local
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-localhost}
+    ports:
+      # По умолчанию только с самого ноутбука. Для Pi — адрес домашней сети и 443.
+      - "${HTTPS_BIND:-127.0.0.1}:${HTTPS_PORT:-8443}:443"
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+    logging: *logging
+
+volumes:
+  app-data:
+  caddy-data:
+  caddy-config:
