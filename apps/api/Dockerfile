@@ -8,6 +8,8 @@ COPY app ./app
 RUN pip install .
 
 COPY alembic.ini entrypoint.sh ./
+# Клон на Windows может принести CRLF: без этого /bin/sh не запустит скрипт.
+RUN sed -i 's/\r$//' entrypoint.sh && chmod +x entrypoint.sh
 COPY migrations ./migrations
 
 RUN useradd --uid 10001 --no-create-home app \
