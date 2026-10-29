@@ -1,0 +1,28 @@
+from logging.config import fileConfig
+
+from alembic import context
+
+from app.config import get_settings
+from app.db import make_engine
+
+config = context.config
+if config.config_file_name is not None:
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
+
+# Модели появятся на этапе 1; autogenerate пока не нужен.
+target_metadata = None
+
+
+def run_migrations_online() -> None:
+    url = config.attributes.get("database_url") or get_settings().database_url
+    engine = make_engine(url)
+    with engine.connect() as connection:
+        context.configure(connection=connection, target_metadata=target_metadata, render_as_batch=True)
+        with context.begin_transaction():
+            context.run_migrations()
+    engine.dispose()
+
+
+if context.is_offline_mode():
+    raise RuntimeError("Offline-миграции не поддерживаются")
+run_migrations_online()

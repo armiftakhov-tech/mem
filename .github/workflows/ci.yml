@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e '.[dev]'
+      - run: pytest -q
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci
+      - run: npm run build
+
+  # AGENTS.md §26, этап 0: сборка ARM64-образов под Raspberry Pi 4 и запуск стека.
+  images-arm64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+      - name: Build and start stack as linux/arm64
+        env:
+          DOCKER_DEFAULT_PLATFORM: linux/arm64
+        run: docker compose -f deploy/compose/compose.yaml up -d --build --wait --wait-timeout 300
+      - name: Smoke test through Caddy
+        run: |
+          uname -m
+          docker compose -f deploy/compose/compose.yaml exec -T app uname -m | grep aarch64
+          curl -fsS --retry 10 --retry-delay 3 --retry-all-errors -k https://localhost:8443/api/health/ready
+          curl -fsS -k https://localhost:8443/ | grep -q '<div id="root">'
+      - if: failure()
+        run: docker compose -f deploy/compose/compose.yaml logs
