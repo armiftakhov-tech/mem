@@ -2,7 +2,7 @@
 
 Приложение для родителей: дать задание ребёнку, проверить в назначенное время, сохранить результат. Требования — [`AGENTS.md`](AGENTS.md), модель данных — [`docs/02-domain-model.md`](docs/02-domain-model.md).
 
-Сейчас готов этап 0: каркас. Экранов ещё нет, только проверка, что связка Caddy → API → SQLite жива.
+Что умеет сейчас: родители (сколько угодно, с равными правами) дают задания детям разово или по дням недели, проверяют в назначенное время, исправляют результат, смотрят историю. Ребёнок со своим входом видит только свои задания и отмечает «сделал». Напоминания и уведомления — внутри приложения.
 
 ## Запуск на ноутбуке
 
@@ -14,7 +14,24 @@ cd mem
 docker compose -f deploy/compose/compose.yaml up -d --build
 ```
 
-Открыть https://localhost:8443. Должно быть «Сервер готов, схема БД 0001».
+Открыть https://localhost:8443.
+
+### Первый вход
+
+1. Взять одноразовый токен из лога сервера:
+   ```sh
+   docker compose -f deploy/compose/compose.yaml logs app | grep "BOOTSTRAP TOKEN"
+   ```
+   Токен живёт 24 часа. Новый: `docker compose -f deploy/compose/compose.yaml exec app python -m app.cli bootstrap-token`.
+2. На экране «Настройка семьи» ввести токен, свой email, пароль и первого ребёнка.
+3. Второй родитель: «Ещё» → «Пригласить второго родителя» → «Новый код». Второй родитель в **другом браузере** (или окне инкогнито) открывает тот же адрес → «Вступить в семью» и вводит код.
+4. Вход ребёнку: «Дети» → ребёнок → «Вход ребёнка», придумать логин и пароль. Ребёнок входит этим логином на том же адресе.
+
+Несколько пользователей на одном компе — это разные браузеры или профили: сессия живёт в cookie браузера.
+
+Забыли пароль родителя: `docker compose -f deploy/compose/compose.yaml exec app python -m app.cli reset-password papa@home`. Пароль ребёнка меняет родитель в профиле ребёнка.
+
+С телефона в той же Wi-Fi сети: в `deploy/compose/.env` поставить `HTTPS_BIND=0.0.0.0` и `SITE_ADDRESS=<IP компа>`, перезапустить и открыть `https://<IP компа>:8443`. Без установленного корневого сертификата телефон будет ругаться.
 
 Браузер сначала ругнётся на сертификат: Caddy выпускает его своим локальным CA. Чтобы предупреждения не было, достать корневой сертификат и добавить в доверенные:
 
@@ -41,7 +58,7 @@ docker compose -f deploy/compose/compose.yaml cp caddy:/data/caddy/pki/authoriti
 cd apps/api && python -m venv .venv && . .venv/bin/activate && pip install -e '.[dev]'
 pytest
 DISCIPLINE_DATABASE_PATH=./dev.db alembic upgrade head
-DISCIPLINE_DATABASE_PATH=./dev.db uvicorn app.main:app --reload
+DISCIPLINE_DATABASE_PATH=./dev.db DISCIPLINE_COOKIE_SECURE=false uvicorn app.main:app --reload
 ```
 
 ```sh
@@ -51,7 +68,7 @@ cd apps/web && npm ci && npm run dev
 ## Структура
 
 - `apps/api/` — FastAPI, SQLAlchemy 2, Alembic, SQLite (WAL, foreign keys).
-- `apps/web/` — React + Vite, PWA-манифест.
+- `apps/web/` — React + Vite, PWA (манифест, кэш оболочки).
 - `deploy/compose/` — Docker Compose: `app` и `caddy`. Наружу открыт только HTTPS Caddy, по умолчанию на `127.0.0.1`.
 - `deploy/caddy/` — Caddyfile и сборка образа с фронтендом.
 - `docs/` — модель данных и [подготовка Raspberry Pi](docs/raspberry-setup.md).
