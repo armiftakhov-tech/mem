@@ -15,7 +15,7 @@ def test_ready_after_migrations(client, migrate):
     migrate()
     r = client.get("/health/ready")
     assert r.status_code == 200
-    assert r.json() == {"status": "ok", "revision": "0001"}
+    assert r.json() == {"status": "ok", "revision": "0002"}
 
 
 def test_sqlite_pragmas(engine):
